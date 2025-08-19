@@ -77,6 +77,8 @@ class RolePermissionSeeder extends Seeder
             'name' => 'Regular User',
             'email' => 'user@example.com',
             'password' => Hash::make('password'),
+            'department' => 'Marketing',
+            'nik' => '123456789',
             'email_verified_at' => now(),
         ]);
         $regularUser->assignRole('User');

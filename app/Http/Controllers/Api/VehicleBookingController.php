@@ -18,7 +18,7 @@ class VehicleBookingController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
-        $query = VehicleBooking::with(['vehicle', 'user:id,name,email']);
+        $query = VehicleBooking::with(['vehicle', 'user:id,name,email,department,nik']);
 
         // Admin can see all bookings, Users only see their own
         if (!$user->can('view bookings') || $user->hasRole('User')) {
@@ -62,6 +62,7 @@ class VehicleBookingController extends Controller
             'vehicle_id' => 'required|exists:vehicles,id',
             'start_time' => 'required|date|after:now',
             'end_time' => 'required|date|after:start_time',
+            'destination' => 'required|string|max:255',
             'notes' => 'nullable|string|max:1000',
         ]);
 
@@ -92,11 +93,12 @@ class VehicleBookingController extends Controller
             'user_id' => $request->user()->id,
             'start_time' => $request->start_time,
             'end_time' => $request->end_time,
+            'destination' => $request->destination,
             'notes' => $request->notes,
             'status' => 'pending', // Default status
         ]);
 
-        $booking->load(['vehicle', 'user:id,name,email']);
+        $booking->load(['vehicle', 'user:id,name,email,department,nik']);
 
         return response()->json([
             'code' => 201,
@@ -121,7 +123,7 @@ class VehicleBookingController extends Controller
             ], 403);
         }
 
-        $booking->load(['vehicle', 'user:id,name,email']);
+        $booking->load(['vehicle', 'user:id,name,email,department,nik']);
 
         return response()->json([
             'code' => 200,
@@ -150,6 +152,7 @@ class VehicleBookingController extends Controller
             'vehicle_id' => 'sometimes|exists:vehicles,id',
             'start_time' => 'sometimes|date|after:now',
             'end_time' => 'sometimes|date|after:start_time',
+            'destination' => 'sometimes|string|max:255',
             'notes' => 'nullable|string|max:1000',
             'status' => [
                 'sometimes',
@@ -170,7 +173,7 @@ class VehicleBookingController extends Controller
 
         if ($request->has(['start_time', 'end_time', 'vehicle_id'])) {
             $vehicle = Vehicle::find($newVehicleId);
-            
+
             if (!$vehicle->isAvailable($newStartTime, $newEndTime, $booking->id)) {
                 return response()->json([
                     'code' => 409,
@@ -182,10 +185,10 @@ class VehicleBookingController extends Controller
             }
         }
 
-        $updateData = $request->only(['vehicle_id', 'start_time', 'end_time', 'notes', 'status']);
+        $updateData = $request->only(['vehicle_id', 'start_time', 'end_time', 'destination', 'notes', 'status']);
         $booking->update($updateData);
 
-        $booking->load(['vehicle', 'user:id,name,email']);
+        $booking->load(['vehicle', 'user:id,name,email,department,nik']);
 
         return response()->json([
             'code' => 200,
@@ -250,7 +253,7 @@ class VehicleBookingController extends Controller
         }
 
         $booking->update(['status' => 'approved']);
-        $booking->load(['vehicle', 'user:id,name,email']);
+        $booking->load(['vehicle', 'user:id,name,email,department,nik']);
 
         return response()->json([
             'code' => 200,
@@ -324,20 +327,20 @@ class VehicleBookingController extends Controller
     private function getConflictingBookings(Vehicle $vehicle, $startTime, $endTime, $excludeId = null): array
     {
         $query = $vehicle->bookings()
-                        ->whereIn('status', ['pending', 'approved'])
-                        ->where(function ($q) use ($startTime, $endTime) {
-                            $q->whereBetween('start_time', [$startTime, $endTime])
-                              ->orWhereBetween('end_time', [$startTime, $endTime])
-                              ->orWhere(function ($qq) use ($startTime, $endTime) {
-                                  $qq->where('start_time', '<=', $startTime)
-                                     ->where('end_time', '>=', $endTime);
-                              });
-                        });
+            ->whereIn('status', ['pending', 'approved'])
+            ->where(function ($q) use ($startTime, $endTime) {
+                $q->whereBetween('start_time', [$startTime, $endTime])
+                    ->orWhereBetween('end_time', [$startTime, $endTime])
+                    ->orWhere(function ($qq) use ($startTime, $endTime) {
+                        $qq->where('start_time', '<=', $startTime)
+                            ->where('end_time', '>=', $endTime);
+                    });
+            });
 
         if ($excludeId) {
             $query->where('id', '!=', $excludeId);
         }
 
-        return $query->with('user:id,name,email')->get()->toArray();
+        return $query->with('user:id,name,email,department,nik')->get()->toArray();
     }
 }

@@ -21,6 +21,7 @@ class VehicleBooking extends Model
         'user_id',
         'start_time',
         'end_time',
+        'destination',
         'status',
         'notes',
     ];

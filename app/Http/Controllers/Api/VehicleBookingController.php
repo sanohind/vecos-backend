@@ -54,6 +54,218 @@ class VehicleBookingController extends Controller
     }
 
     /**
+     * Get approved bookings schedule for today and tomorrow.
+     * This endpoint allows all users to see when vehicles are booked.
+     */
+    public function schedule(Request $request): JsonResponse
+    {
+        $request->validate([
+            'vehicle_id' => 'nullable|exists:vehicles,id',
+            'date' => 'nullable|date|date_format:Y-m-d',
+            'days' => 'nullable|integer|min:1|max:7', // Allow checking up to 7 days ahead
+        ]);
+
+        $startDate = $request->has('date') 
+            ? Carbon::parse($request->date)->startOfDay()
+            : Carbon::today();
+        
+        $days = $request->get('days', 2); // Default: today and tomorrow
+        $endDate = $startDate->copy()->addDays($days - 1)->endOfDay();
+
+        $query = VehicleBooking::with(['vehicle:id,vehicle_id,plat_no,brand,model', 'user:id,name,department'])
+            ->where('status', 'approved')
+            ->where(function ($q) use ($startDate, $endDate) {
+                // Include bookings that overlap with our date range
+                $q->whereBetween('start_time', [$startDate, $endDate])
+                  ->orWhereBetween('end_time', [$startDate, $endDate])
+                  ->orWhere(function ($qq) use ($startDate, $endDate) {
+                      $qq->where('start_time', '<=', $startDate)
+                         ->where('end_time', '>=', $endDate);
+                  });
+            });
+
+        // Filter by specific vehicle if requested
+        if ($request->has('vehicle_id')) {
+            $query->where('vehicle_id', $request->vehicle_id);
+        }
+
+        $bookings = $query->orderBy('start_time')->get();
+
+        // Group bookings by date for better organization
+        $scheduleByDate = [];
+        $currentDate = $startDate->copy();
+
+        for ($i = 0; $i < $days; $i++) {
+            $dateKey = $currentDate->format('Y-m-d');
+            $scheduleByDate[$dateKey] = [
+                'date' => $dateKey,
+                'day_name' => $currentDate->format('l'),
+                'is_today' => $currentDate->isToday(),
+                'is_tomorrow' => $currentDate->isTomorrow(),
+                'bookings' => []
+            ];
+            
+            // Filter bookings for this specific date
+            $dayBookings = $bookings->filter(function ($booking) use ($currentDate) {
+                $bookingStart = Carbon::parse($booking->start_time);
+                $bookingEnd = Carbon::parse($booking->end_time);
+                
+                // Check if booking overlaps with this day
+                return $bookingStart->format('Y-m-d') <= $currentDate->format('Y-m-d') &&
+                       $bookingEnd->format('Y-m-d') >= $currentDate->format('Y-m-d');
+            });
+
+            foreach ($dayBookings as $booking) {
+                $scheduleByDate[$dateKey]['bookings'][] = [
+                    'id' => $booking->id,
+                    'vehicle' => [
+                        'id' => $booking->vehicle->id,
+                        'vehicle_id' => $booking->vehicle->vehicle_id,
+                        'plat_no' => $booking->vehicle->plat_no,
+                        'brand' => $booking->vehicle->brand,
+                        'model' => $booking->vehicle->model,
+                        'display_name' => $booking->vehicle->brand . ' ' . $booking->vehicle->model,
+                    ],
+                    'user' => [
+                        'name' => $booking->user->name,
+                        'department' => $booking->user->department,
+                    ],
+                    'start_time' => $booking->start_time,
+                    'end_time' => $booking->end_time,
+                    'destination' => $booking->destination,
+                    'duration_hours' => $booking->duration,
+                    'time_display' => Carbon::parse($booking->start_time)->format('H:i') . ' - ' . 
+                                    Carbon::parse($booking->end_time)->format('H:i'),
+                ];
+            }
+
+            $currentDate->addDay();
+        }
+
+        return response()->json([
+            'code' => 200,
+            'message' => 'Booking schedule retrieved successfully',
+            'data' => [
+                'period' => [
+                    'start_date' => $startDate->format('Y-m-d'),
+                    'end_date' => $endDate->format('Y-m-d'),
+                    'days' => $days,
+                ],
+                'schedule' => array_values($scheduleByDate),
+                'total_bookings' => $bookings->count(),
+            ]
+        ]);
+    }
+
+    /**
+     * Get available time slots for a specific vehicle and date.
+     * This helps users find available times for booking.
+     */
+    public function availableSlots(Request $request): JsonResponse
+    {
+        $request->validate([
+            'vehicle_id' => 'required|exists:vehicles,id',
+            'date' => 'required|date|date_format:Y-m-d|after_or_equal:today',
+            'working_hours_start' => 'nullable|date_format:H:i',
+            'working_hours_end' => 'nullable|date_format:H:i',
+            'slot_duration' => 'nullable|integer|min:1|max:24', // hours
+        ]);
+
+        $vehicle = Vehicle::find($request->vehicle_id);
+        $date = Carbon::parse($request->date);
+        $workingStart = $request->get('working_hours_start', '07:00');
+        $workingEnd = $request->get('working_hours_end', '17:00');
+        $slotDuration = $request->get('slot_duration', 2); // Default 2 hours
+
+        // Get approved bookings for this vehicle on this date
+        $existingBookings = VehicleBooking::where('vehicle_id', $request->vehicle_id)
+            ->where('status', 'approved')
+            ->where(function ($q) use ($date) {
+                $dayStart = $date->copy()->startOfDay();
+                $dayEnd = $date->copy()->endOfDay();
+                
+                $q->whereBetween('start_time', [$dayStart, $dayEnd])
+                  ->orWhereBetween('end_time', [$dayStart, $dayEnd])
+                  ->orWhere(function ($qq) use ($dayStart, $dayEnd) {
+                      $qq->where('start_time', '<=', $dayStart)
+                         ->where('end_time', '>=', $dayEnd);
+                  });
+            })
+            ->orderBy('start_time')
+            ->get();
+
+        // Generate time slots
+        $availableSlots = [];
+        $currentSlot = $date->copy()->setTimeFromTimeString($workingStart);
+        $endOfDay = $date->copy()->setTimeFromTimeString($workingEnd);
+
+        while ($currentSlot->copy()->addHours($slotDuration)->lte($endOfDay)) {
+            $slotEnd = $currentSlot->copy()->addHours($slotDuration);
+            
+            // Check if this slot conflicts with existing bookings
+            $hasConflict = false;
+            foreach ($existingBookings as $booking) {
+                $bookingStart = Carbon::parse($booking->start_time);
+                $bookingEnd = Carbon::parse($booking->end_time);
+                
+                if ($currentSlot->lt($bookingEnd) && $slotEnd->gt($bookingStart)) {
+                    $hasConflict = true;
+                    break;
+                }
+            }
+
+            // Skip slots in the past
+            if ($currentSlot->isPast()) {
+                $currentSlot->addHour();
+                continue;
+            }
+
+            $availableSlots[] = [
+                'start_time' => $currentSlot->toISOString(),
+                'end_time' => $slotEnd->toISOString(),
+                'start_display' => $currentSlot->format('H:i'),
+                'end_display' => $slotEnd->format('H:i'),
+                'duration_hours' => $slotDuration,
+                'is_available' => !$hasConflict,
+                'is_past' => $currentSlot->isPast(),
+            ];
+
+            $currentSlot->addHour();
+        }
+
+        return response()->json([
+            'code' => 200,
+            'message' => 'Available time slots retrieved successfully',
+            'data' => [
+                'vehicle' => [
+                    'id' => $vehicle->id,
+                    'vehicle_id' => $vehicle->vehicle_id,
+                    'plat_no' => $vehicle->plat_no,
+                    'brand' => $vehicle->brand,
+                    'model' => $vehicle->model,
+                    'display_name' => $vehicle->brand . ' ' . $vehicle->model,
+                ],
+                'date' => $date->format('Y-m-d'),
+                'working_hours' => [
+                    'start' => $workingStart,
+                    'end' => $workingEnd,
+                ],
+                'slot_duration_hours' => $slotDuration,
+                'slots' => $availableSlots,
+                'available_slots_count' => collect($availableSlots)->where('is_available', true)->count(),
+                'existing_bookings' => $existingBookings->map(function ($booking) {
+                    return [
+                        'start_time' => $booking->start_time,
+                        'end_time' => $booking->end_time,
+                        'user_name' => $booking->user->name,
+                        'destination' => $booking->destination,
+                    ];
+                }),
+            ]
+        ]);
+    }
+
+    /**
      * Store a newly created booking.
      */
     public function store(Request $request): JsonResponse

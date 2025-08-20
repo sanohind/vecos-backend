@@ -64,7 +64,7 @@ class AuthController extends Controller
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
             'department' => ['required', Rule::in(['Accounting', 'Marketing', 'Purchasing', 'QC & Engineering', 'Maintenance', 'HR & GA', 'Brazing', 'Chassis', 'Nylon', 'PPIC'])],
-            'nik' => 'required|string|min:16|unique:users,nik',
+            'nik' => 'required|string|min:6|unique:users,nik',
         ]);
 
         $user = User::create([

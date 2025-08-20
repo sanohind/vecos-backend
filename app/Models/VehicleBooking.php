@@ -6,10 +6,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Carbon\Carbon;
+use App\Traits\HasCorrectTimestamps;
 
 class VehicleBooking extends Model
 {
-    use HasFactory;
+    use HasFactory, HasCorrectTimestamps;
 
     /**
      * The attributes that are mass assignable.

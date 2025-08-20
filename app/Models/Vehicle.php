@@ -5,10 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Traits\HasCorrectTimestamps;
 
 class Vehicle extends Model
 {
-    use HasFactory;
+    use HasFactory, HasCorrectTimestamps;
 
     /**
      * The attributes that are mass assignable.

@@ -35,9 +35,38 @@ class VehicleBookingController extends Controller
             $query->where('vehicle_id', $request->vehicle_id);
         }
 
+        // Search functionality
+        if ($request->has('search') && !empty($request->search)) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('user', function ($userQuery) use ($search) {
+                    $userQuery->where('name', 'like', "%{$search}%")
+                              ->orWhere('email', 'like', "%{$search}%");
+                })
+                ->orWhereHas('vehicle', function ($vehicleQuery) use ($search) {
+                    $vehicleQuery->where('brand', 'like', "%{$search}%")
+                                 ->orWhere('model', 'like', "%{$search}%")
+                                 ->orWhere('plat_no', 'like', "%{$search}%");
+                })
+                ->orWhere('destination', 'like', "%{$search}%")
+                ->orWhere('notes', 'like', "%{$search}%");
+            });
+        }
+
         // Filter by date range
         if ($request->has('start_date') && $request->has('end_date')) {
-            $query->whereBetween('start_time', [$request->start_date, $request->end_date]);
+            $startDate = Carbon::parse($request->start_date)->startOfDay();
+            $endDate = Carbon::parse($request->end_date)->endOfDay();
+            
+            $query->where(function ($q) use ($startDate, $endDate) {
+                // Include bookings that overlap with our date range
+                $q->whereBetween('start_time', [$startDate, $endDate])
+                  ->orWhereBetween('end_time', [$startDate, $endDate])
+                  ->orWhere(function ($qq) use ($startDate, $endDate) {
+                      $qq->where('start_time', '<=', $startDate)
+                         ->where('end_time', '>=', $endDate);
+                  });
+            });
         }
 
         // Sort by start_time
@@ -60,7 +89,7 @@ class VehicleBookingController extends Controller
     public function schedule(Request $request): JsonResponse
     {
         $request->validate([
-            'vehicle_id' => 'nullable|exists:vehicles,id',
+            // 'vehicle_id' => 'nullable|exists:vehicles,id',
             'date' => 'nullable|date|date_format:Y-m-d',
             'days' => 'nullable|integer|min:1|max:7', // Allow checking up to 7 days ahead
         ]);
@@ -72,8 +101,8 @@ class VehicleBookingController extends Controller
         $days = $request->get('days', 2); // Default: today and tomorrow
         $endDate = $startDate->copy()->addDays($days - 1)->endOfDay();
 
-        $query = VehicleBooking::with(['vehicle:id,vehicle_id,plat_no,brand,model', 'user:id,name,department'])
-            ->where('status', 'approved')
+        $query = VehicleBooking::with(['vehicle:id,plat_no,brand,model', 'user:id,name,department'])
+            ->whereIn('status', ['approved', 'pending'])
             ->where(function ($q) use ($startDate, $endDate) {
                 // Include bookings that overlap with our date range
                 $q->whereBetween('start_time', [$startDate, $endDate])
@@ -118,9 +147,9 @@ class VehicleBookingController extends Controller
             foreach ($dayBookings as $booking) {
                 $scheduleByDate[$dateKey]['bookings'][] = [
                     'id' => $booking->id,
+                    'status' => $booking->status, // Add status field
                     'vehicle' => [
                         'id' => $booking->vehicle->id,
-                        'vehicle_id' => $booking->vehicle->vehicle_id,
                         'plat_no' => $booking->vehicle->plat_no,
                         'brand' => $booking->vehicle->brand,
                         'model' => $booking->vehicle->model,
@@ -173,8 +202,8 @@ class VehicleBookingController extends Controller
 
         $vehicle = Vehicle::find($request->vehicle_id);
         $date = Carbon::parse($request->date);
-        $workingStart = $request->get('working_hours_start', '07:00');
-        $workingEnd = $request->get('working_hours_end', '17:00');
+        $workingStart = $request->get('working_hours_start', '00:00');
+        $workingEnd = $request->get('working_hours_end', '23:59');
         $slotDuration = $request->get('slot_duration', 2); // Default 2 hours
 
         // Get approved bookings for this vehicle on this date
@@ -239,7 +268,6 @@ class VehicleBookingController extends Controller
             'data' => [
                 'vehicle' => [
                     'id' => $vehicle->id,
-                    'vehicle_id' => $vehicle->vehicle_id,
                     'plat_no' => $vehicle->plat_no,
                     'brand' => $vehicle->brand,
                     'model' => $vehicle->model,

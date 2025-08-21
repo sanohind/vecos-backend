@@ -28,8 +28,7 @@ class VehicleController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('brand', 'like', "%{$search}%")
                   ->orWhere('model', 'like', "%{$search}%")
-                  ->orWhere('plat_no', 'like', "%{$search}%")
-                  ->orWhere('vehicle_id', 'like', "%{$search}%");
+                  ->orWhere('plat_no', 'like', "%{$search}%");
             });
         }
 
@@ -63,7 +62,6 @@ class VehicleController extends Controller
         }
 
         $request->validate([
-            'vehicle_id' => 'required|string|unique:vehicles,vehicle_id|max:255',
             'plat_no' => 'required|string|unique:vehicles,plat_no|max:255',
             'brand' => 'required|string|max:255',
             'model' => 'required|string|max:255',
@@ -71,7 +69,6 @@ class VehicleController extends Controller
         ]);
 
         $vehicle = Vehicle::create([
-            'vehicle_id' => $request->vehicle_id,
             'plat_no' => strtoupper($request->plat_no), // Normalize to uppercase
             'brand' => $request->brand,
             'model' => $request->model,
@@ -117,12 +114,6 @@ class VehicleController extends Controller
         }
 
         $request->validate([
-            'vehicle_id' => [
-                'sometimes',
-                'string',
-                'max:255',
-                Rule::unique('vehicles', 'vehicle_id')->ignore($vehicle->id)
-            ],
             'plat_no' => [
                 'sometimes',
                 'string', 
@@ -134,7 +125,7 @@ class VehicleController extends Controller
             'status' => ['sometimes', Rule::in(['active', 'inactive'])],
         ]);
 
-        $updateData = $request->only(['vehicle_id', 'plat_no', 'brand', 'model', 'status']);
+        $updateData = $request->only(['plat_no', 'brand', 'model', 'status']);
         
         // Normalize plat_no to uppercase if provided
         if (isset($updateData['plat_no'])) {
@@ -195,12 +186,13 @@ class VehicleController extends Controller
     public function available(Request $request): JsonResponse
     {
         $request->validate([
-            'start_time' => 'required|date|after:now',
-            'end_time' => 'required|date|after:start_time',
+            'start_date' => 'required|date|after_or_equal:today',
+            'end_date' => 'required|date|after_or_equal:start_date',
         ]);
 
-        $startTime = $request->start_time;
-        $endTime = $request->end_time;
+        // Convert dates to datetime with time
+        $startTime = $request->start_date . ' 00:00:00';
+        $endTime = $request->end_date . ' 23:59:59';
 
         $availableVehicles = Vehicle::active()
             ->whereDoesntHave('bookings', function ($query) use ($startTime, $endTime) {
@@ -222,6 +214,8 @@ class VehicleController extends Controller
             'data' => [
                 'vehicles' => $availableVehicles,
                 'time_range' => [
+                    'start_date' => $request->start_date,
+                    'end_date' => $request->end_date,
                     'start_time' => $startTime,
                     'end_time' => $endTime,
                 ],

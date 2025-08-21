@@ -117,7 +117,7 @@ Route::get('/docs', function () {
                 'Bookings' => [
                     'GET /api/bookings' => 'List user bookings (or all for Admin)',
                     'GET /api/bookings/stats' => 'Get booking statistics',
-                    'GET /api/bookings/schedule' => 'Get approved bookings schedule (today & tomorrow by default)',
+                    'GET /api/bookings/schedule' => 'Get approved and pending bookings schedule (today & tomorrow by default)',
                     'GET /api/bookings/available-slots' => 'Get available time slots for a vehicle',
                     'POST /api/bookings' => 'Create new booking',
                     'GET /api/bookings/{id}' => 'Get specific booking',
@@ -129,21 +129,21 @@ Route::get('/docs', function () {
             ],
             'schedule_endpoints' => [
                 'GET /api/bookings/schedule' => [
-                    'description' => 'Get approved bookings for specific date range',
+                    'description' => 'Get approved and pending bookings for specific date range',
                     'parameters' => [
-                        'vehicle_id' => 'optional - filter by specific vehicle',
+                        'vehicle_id' => 'optional - vehicles.id (PK) to filter a specific vehicle',
                         'date' => 'optional - start date (Y-m-d format, defaults to today)',
                         'days' => 'optional - number of days to show (1-7, defaults to 2)',
                     ],
                     'example' => '/api/bookings/schedule?vehicle_id=1&date=2025-08-20&days=3'
                 ],
                 'GET /api/bookings/available-slots' => [
-                    'description' => 'Get available time slots for booking a vehicle',
+                    'description' => 'Get available time slots for booking a vehicle (24/7 by default)',
                     'parameters' => [
-                        'vehicle_id' => 'required - vehicle ID to check',
+                        'vehicle_id' => 'required - vehicles.id (PK) to check',
                         'date' => 'required - date to check (Y-m-d format)',
-                        'working_hours_start' => 'optional - working start time (H:i format, defaults to 07:00)',
-                        'working_hours_end' => 'optional - working end time (H:i format, defaults to 17:00)',
+                        'working_hours_start' => 'optional - start time window (H:i format, defaults to 00:00)',
+                        'working_hours_end' => 'optional - end time window (H:i format, defaults to 23:59)',
                         'slot_duration' => 'optional - slot duration in hours (defaults to 2)',
                     ],
                     'example' => '/api/bookings/available-slots?vehicle_id=1&date=2025-08-21&slot_duration=3'

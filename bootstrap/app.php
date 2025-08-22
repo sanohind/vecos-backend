@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Console\Scheduling\Schedule;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -23,6 +24,19 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->api(prepend: [
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
         ]);
+    })
+    ->withSchedule(function (Schedule $schedule) {
+        // 🎯 AUTO-COMPLETE BOOKING SCHEDULING
+        $schedule->command('bookings:auto-complete')
+                 ->everyFifteenMinutes()
+                 ->withoutOverlapping()
+                 ->runInBackground()
+                 ->appendOutputTo(storage_path('logs/auto-complete-bookings.log'));
+        
+        // Alternative scheduling options:
+        // $schedule->command('bookings:auto-complete')->hourly();
+        // $schedule->command('bookings:auto-complete')->dailyAt('02:00');
+        // $schedule->command('bookings:auto-complete')->twiceDaily(9, 21);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\Rule;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 
 class VehicleBookingController extends Controller
 {
@@ -41,15 +42,15 @@ class VehicleBookingController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->whereHas('user', function ($userQuery) use ($search) {
                     $userQuery->where('name', 'like', "%{$search}%")
-                              ->orWhere('email', 'like', "%{$search}%");
+                        ->orWhere('email', 'like', "%{$search}%");
                 })
-                ->orWhereHas('vehicle', function ($vehicleQuery) use ($search) {
-                    $vehicleQuery->where('brand', 'like', "%{$search}%")
-                                 ->orWhere('model', 'like', "%{$search}%")
-                                 ->orWhere('plat_no', 'like', "%{$search}%");
-                })
-                ->orWhere('destination', 'like', "%{$search}%")
-                ->orWhere('notes', 'like', "%{$search}%");
+                    ->orWhereHas('vehicle', function ($vehicleQuery) use ($search) {
+                        $vehicleQuery->where('brand', 'like', "%{$search}%")
+                            ->orWhere('model', 'like', "%{$search}%")
+                            ->orWhere('plat_no', 'like', "%{$search}%");
+                    })
+                    ->orWhere('destination', 'like', "%{$search}%")
+                    ->orWhere('notes', 'like', "%{$search}%");
             });
         }
 
@@ -57,15 +58,15 @@ class VehicleBookingController extends Controller
         if ($request->has('start_date') && $request->has('end_date')) {
             $startDate = Carbon::parse($request->start_date)->startOfDay();
             $endDate = Carbon::parse($request->end_date)->endOfDay();
-            
+
             $query->where(function ($q) use ($startDate, $endDate) {
                 // Include bookings that overlap with our date range
                 $q->whereBetween('start_time', [$startDate, $endDate])
-                  ->orWhereBetween('end_time', [$startDate, $endDate])
-                  ->orWhere(function ($qq) use ($startDate, $endDate) {
-                      $qq->where('start_time', '<=', $startDate)
-                         ->where('end_time', '>=', $endDate);
-                  });
+                    ->orWhereBetween('end_time', [$startDate, $endDate])
+                    ->orWhere(function ($qq) use ($startDate, $endDate) {
+                        $qq->where('start_time', '<=', $startDate)
+                            ->where('end_time', '>=', $endDate);
+                    });
             });
         }
 
@@ -94,10 +95,10 @@ class VehicleBookingController extends Controller
             'days' => 'nullable|integer|min:1|max:7', // Allow checking up to 7 days ahead
         ]);
 
-        $startDate = $request->has('date') 
+        $startDate = $request->has('date')
             ? Carbon::parse($request->date)->startOfDay()
             : Carbon::today();
-        
+
         $days = $request->get('days', 2); // Default: today and tomorrow
         $endDate = $startDate->copy()->addDays($days - 1)->endOfDay();
 
@@ -106,11 +107,11 @@ class VehicleBookingController extends Controller
             ->where(function ($q) use ($startDate, $endDate) {
                 // Include bookings that overlap with our date range
                 $q->whereBetween('start_time', [$startDate, $endDate])
-                  ->orWhereBetween('end_time', [$startDate, $endDate])
-                  ->orWhere(function ($qq) use ($startDate, $endDate) {
-                      $qq->where('start_time', '<=', $startDate)
-                         ->where('end_time', '>=', $endDate);
-                  });
+                    ->orWhereBetween('end_time', [$startDate, $endDate])
+                    ->orWhere(function ($qq) use ($startDate, $endDate) {
+                        $qq->where('start_time', '<=', $startDate)
+                            ->where('end_time', '>=', $endDate);
+                    });
             });
 
         // Filter by specific vehicle if requested
@@ -133,15 +134,15 @@ class VehicleBookingController extends Controller
                 'is_tomorrow' => $currentDate->isTomorrow(),
                 'bookings' => []
             ];
-            
+
             // Filter bookings for this specific date
             $dayBookings = $bookings->filter(function ($booking) use ($currentDate) {
                 $bookingStart = Carbon::parse($booking->start_time);
                 $bookingEnd = Carbon::parse($booking->end_time);
-                
+
                 // Check if booking overlaps with this day
                 return $bookingStart->format('Y-m-d') <= $currentDate->format('Y-m-d') &&
-                       $bookingEnd->format('Y-m-d') >= $currentDate->format('Y-m-d');
+                    $bookingEnd->format('Y-m-d') >= $currentDate->format('Y-m-d');
             });
 
             foreach ($dayBookings as $booking) {
@@ -163,8 +164,8 @@ class VehicleBookingController extends Controller
                     'end_time' => $booking->end_time,
                     'destination' => $booking->destination,
                     'duration_hours' => $booking->duration,
-                    'time_display' => Carbon::parse($booking->start_time)->format('H:i') . ' - ' . 
-                                    Carbon::parse($booking->end_time)->format('H:i'),
+                    'time_display' => Carbon::parse($booking->start_time)->format('H:i') . ' - ' .
+                        Carbon::parse($booking->end_time)->format('H:i'),
                 ];
             }
 
@@ -212,13 +213,13 @@ class VehicleBookingController extends Controller
             ->where(function ($q) use ($date) {
                 $dayStart = $date->copy()->startOfDay();
                 $dayEnd = $date->copy()->endOfDay();
-                
+
                 $q->whereBetween('start_time', [$dayStart, $dayEnd])
-                  ->orWhereBetween('end_time', [$dayStart, $dayEnd])
-                  ->orWhere(function ($qq) use ($dayStart, $dayEnd) {
-                      $qq->where('start_time', '<=', $dayStart)
-                         ->where('end_time', '>=', $dayEnd);
-                  });
+                    ->orWhereBetween('end_time', [$dayStart, $dayEnd])
+                    ->orWhere(function ($qq) use ($dayStart, $dayEnd) {
+                        $qq->where('start_time', '<=', $dayStart)
+                            ->where('end_time', '>=', $dayEnd);
+                    });
             })
             ->orderBy('start_time')
             ->get();
@@ -230,13 +231,13 @@ class VehicleBookingController extends Controller
 
         while ($currentSlot->copy()->addHours($slotDuration)->lte($endOfDay)) {
             $slotEnd = $currentSlot->copy()->addHours($slotDuration);
-            
+
             // Check if this slot conflicts with existing bookings
             $hasConflict = false;
             foreach ($existingBookings as $booking) {
                 $bookingStart = Carbon::parse($booking->start_time);
                 $bookingEnd = Carbon::parse($booking->end_time);
-                
+
                 if ($currentSlot->lt($bookingEnd) && $slotEnd->gt($bookingStart)) {
                     $hasConflict = true;
                     break;
@@ -551,6 +552,7 @@ class VehicleBookingController extends Controller
             'pending' => $query->clone()->where('status', 'pending')->count(),
             'approved' => $query->clone()->where('status', 'approved')->count(),
             'rejected' => $query->clone()->where('status', 'rejected')->count(),
+            'completed' => $query->clone()->where('status', 'completed')->count(), // NEW!
             'this_month' => $query->clone()->whereMonth('created_at', now()->month)->count(),
         ];
 
@@ -582,5 +584,208 @@ class VehicleBookingController extends Controller
         }
 
         return $query->with('user:id,name,email,department,nik')->get()->toArray();
+    }
+
+    /**
+     * Complete a booking (Admin only).
+     * This allows admin to mark a booking as completed before its scheduled end time.
+     */
+    public function complete(Request $request, VehicleBooking $booking): JsonResponse
+    {
+        if (!$request->user()->can('approve bookings')) {
+            return response()->json([
+                'code' => 403,
+                'message' => 'Access denied. Only administrators can complete bookings.',
+                'data' => null
+            ], 403);
+        }
+
+        if ($booking->status !== 'approved') {
+            return response()->json([
+                'code' => 400,
+                'message' => 'Only approved bookings can be completed',
+                'data' => null
+            ], 400);
+        }
+
+        // Optional: Allow admin to set custom completion time
+        $completionTime = $request->get('completion_time', now());
+
+        // Validate completion time
+        if ($completionTime) {
+            $completionTime = Carbon::parse($completionTime);
+
+            // Completion time should not be before start time
+            if ($completionTime->lt($booking->start_time)) {
+                return response()->json([
+                    'code' => 400,
+                    'message' => 'Completion time cannot be before start time',
+                    'data' => null
+                ], 400);
+            }
+
+            // Update end_time to actual completion time
+            $booking->end_time = $completionTime;
+        }
+
+        // Update status to completed
+        $booking->update([
+            'status' => 'completed',
+            'end_time' => $booking->end_time, // This will be the custom completion time if provided
+        ]);
+
+        $booking->load(['vehicle', 'user:id,name,email,department,nik']);
+
+        return response()->json([
+            'code' => 200,
+            'message' => 'Booking completed successfully',
+            'data' => $booking
+        ]);
+    }
+
+    /**
+     * Get expired bookings that should be completed.
+     */
+    public function expired(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        /** @var Builder $query */
+        $query = VehicleBooking::query()
+            ->with(['vehicle', 'user:id,name,email,department,nik'])
+            ->where('status', 'approved')
+            ->where('end_time', '<', Carbon::now());
+
+        // Admin can see all expired bookings, Users only see their own
+        if (!$user->can('view bookings') || $user->hasRole('User')) {
+            $query->where('user_id', $user->id);
+        }
+
+        $expiredBookings = $query->orderBy('end_time', 'desc')->paginate(10);
+
+        return response()->json([
+            'code' => 200,
+            'message' => 'Expired bookings retrieved successfully',
+            'data' => $expiredBookings
+        ]);
+    }
+
+    /**
+     * Manually trigger auto-completion of expired bookings (Admin only).
+     */
+    public function autoComplete(Request $request): JsonResponse
+    {
+        if (!$request->user()->can('approve bookings')) {
+            return response()->json([
+                'code' => 403,
+                'message' => 'Access denied. Only administrators can trigger auto-completion.',
+                'data' => null
+            ], 403);
+        }
+
+        $request->validate([
+            'booking_ids' => 'nullable|array',
+            'booking_ids.*' => 'exists:vehicle_bookings,id',
+            'hours_buffer' => 'nullable|integer|min:0|max:72', // Allow up to 3 days buffer
+        ]);
+
+        $hoursBuffer = $request->get('hours_buffer', 0);
+        $cutoffTime = Carbon::now()->subHours($hoursBuffer);
+
+        // Build query for expired bookings
+        /** @var Builder $query */
+        $query = VehicleBooking::query()
+            ->where('status', 'approved')
+            ->where('end_time', '<', $cutoffTime);
+
+        // If specific booking IDs are provided, filter by them
+        if ($request->has('booking_ids')) {
+            $query->whereIn('id', $request->booking_ids);
+        }
+
+        $expiredBookings = $query->with(['vehicle', 'user:id,name,email,department,nik'])->get();
+
+        if ($expiredBookings->isEmpty()) {
+            return response()->json([
+                'code' => 200,
+                'message' => 'No expired bookings found to complete',
+                'data' => [
+                    'completed_count' => 0,
+                    'completed_bookings' => [],
+                    'cutoff_time' => $cutoffTime->toISOString(),
+                ]
+            ]);
+        }
+
+        $completedBookings = [];
+        $failedBookings = [];
+
+        foreach ($expiredBookings as $booking) {
+            try {
+                $booking->update(['status' => 'completed']);
+                $completedBookings[] = [
+                    'id' => $booking->id,
+                    'vehicle' => $booking->vehicle->brand . ' ' . $booking->vehicle->model,
+                    'user' => $booking->user->name,
+                    'end_time' => $booking->end_time,
+                    'destination' => $booking->destination,
+                ];
+            } catch (\Exception $e) {
+                $failedBookings[] = [
+                    'id' => $booking->id,
+                    'error' => $e->getMessage(),
+                ];
+            }
+        }
+
+        return response()->json([
+            'code' => 200,
+            'message' => 'Auto-completion process completed',
+            'data' => [
+                'completed_count' => count($completedBookings),
+                'failed_count' => count($failedBookings),
+                'completed_bookings' => $completedBookings,
+                'failed_bookings' => $failedBookings,
+                'cutoff_time' => $cutoffTime->toISOString(),
+            ]
+        ]);
+    }
+
+    /**
+     * Get booking status summary including expired bookings.
+     */
+    public function statusSummary(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        /** @var Builder $baseQuery */
+        $baseQuery = VehicleBooking::query();
+
+        // Admin sees all stats, users see only their stats
+        if (!$user->can('view bookings') || $user->hasRole('User')) {
+            $baseQuery->where('user_id', $user->id);
+        }
+
+        $now = Carbon::now();
+
+        $stats = [
+            'total' => $baseQuery->count(),
+            'pending' => $baseQuery->clone()->where('status', 'pending')->count(),
+            'approved' => $baseQuery->clone()->where('status', 'approved')->count(),
+            'rejected' => $baseQuery->clone()->where('status', 'rejected')->count(),
+            'completed' => $baseQuery->clone()->where('status', 'completed')->count(),
+            'expired' => $baseQuery->clone()->where('status', 'approved')->where('end_time', '<', $now)->count(),
+            'active' => $baseQuery->clone()->where('status', 'approved')
+                ->where('start_time', '<=', $now)
+                ->where('end_time', '>=', $now)->count(),
+            'this_month' => $baseQuery->clone()->whereMonth('created_at', $now->month)->count(),
+            'today' => $baseQuery->clone()->whereDate('created_at', $now->toDateString())->count(),
+        ];
+
+        return response()->json([
+            'code' => 200,
+            'message' => 'Booking status summary retrieved successfully',
+            'data' => $stats
+        ]);
     }
 }

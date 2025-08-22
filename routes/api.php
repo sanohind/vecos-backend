@@ -66,10 +66,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{booking}', [VehicleBookingController::class, 'destroy']);
         
         // Admin-only booking routes
-        Route::middleware(['role:Admin'])->group(function () {
-            Route::post('/{booking}/approve', [VehicleBookingController::class, 'approve']);
-            Route::post('/{booking}/reject', [VehicleBookingController::class, 'reject']);
-        });
+Route::middleware(['role:Admin'])->group(function () {
+    Route::post('/{booking}/approve', [VehicleBookingController::class, 'approve']);
+    Route::post('/{booking}/reject', [VehicleBookingController::class, 'reject']);
+    Route::post('/{booking}/complete', [VehicleBookingController::class, 'complete']); // NEW!
+});
     });
 
     // API Resource Routes (Alternative approach - commented for reference)

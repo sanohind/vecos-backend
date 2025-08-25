@@ -27,7 +27,7 @@ class VehicleBookingController extends Controller
         }
 
         // Filter by status
-        if ($request->has('status') && in_array($request->status, ['pending', 'approved', 'rejected'])) {
+        if ($request->has('status') && in_array($request->status, ['pending', 'approved', 'rejected', 'completed', 'cancelled'])) {
             $query->where('status', $request->status);
         }
 
@@ -397,7 +397,7 @@ class VehicleBookingController extends Controller
             'notes' => 'nullable|string|max:1000',
             'status' => [
                 'sometimes',
-                Rule::in(['pending', 'approved', 'rejected']),
+                Rule::in(['pending', 'approved', 'rejected', 'completed', 'cancelled']),
                 function ($attribute, $value, $fail) use ($user) {
                     // Only admin can change status
                     if (!$user->can('approve bookings') && in_array($value, ['approved', 'rejected'])) {
@@ -454,11 +454,11 @@ class VehicleBookingController extends Controller
             ], 403);
         }
 
-        $booking->delete();
+        $booking->update(['status' => 'cancelled']);
 
         return response()->json([
             'code' => 200,
-            'message' => 'Booking deleted successfully',
+            'message' => 'Booking cancelled successfully',
             'data' => null
         ]);
     }
@@ -552,13 +552,53 @@ class VehicleBookingController extends Controller
             'pending' => $query->clone()->where('status', 'pending')->count(),
             'approved' => $query->clone()->where('status', 'approved')->count(),
             'rejected' => $query->clone()->where('status', 'rejected')->count(),
-            'completed' => $query->clone()->where('status', 'completed')->count(), // NEW!
+            'completed' => $query->clone()->where('status', 'completed')->count(),
+            'cancelled' => $query->clone()->where('status', 'cancelled')->count(),
             'this_month' => $query->clone()->whereMonth('created_at', now()->month)->count(),
         ];
 
         return response()->json([
             'code' => 200,
             'message' => 'Booking statistics retrieved successfully',
+            'data' => $stats
+        ]);
+    }
+
+    /**
+     * Get booking status summary including expired bookings.
+     */
+    public function statusSummary(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        /** @var Builder $baseQuery */
+        $baseQuery = VehicleBooking::query();
+
+        // Admin sees all stats, users see only their stats
+        if (!$user->can('view bookings') || $user->hasRole('User')) {
+            $baseQuery->where('user_id', $user->id);
+        }
+
+        $now = Carbon::now();
+
+        $stats = [
+            'total' => $baseQuery->count(),
+            'pending' => $baseQuery->clone()->where('status', 'pending')->count(),
+            'approved' => $baseQuery->clone()->where('status', 'approved')->count(),
+            'rejected' => $baseQuery->clone()->where('status', 'rejected')->count(),
+            'completed' => $baseQuery->clone()->where('status', 'completed')->count(),
+            'cancelled' => $baseQuery->clone()->where('status', 'cancelled')->count(),
+            'expired' => $baseQuery->clone()->where('status', 'approved')->where('end_time', '<', $now)->count(),
+            'active' => $baseQuery->clone()->where('status', 'approved')
+                ->where('start_time', '<=', $now)
+                ->where('end_time', '>=', $now)->count(),
+            'this_month' => $baseQuery->clone()->whereMonth('created_at', $now->month)->count(),
+            'today' => $baseQuery->clone()->whereDate('created_at', $now->toDateString())->count(),
+        ];
+
+        return response()->json([
+            'code' => 200,
+            'message' => 'Booking status summary retrieved successfully',
             'data' => $stats
         ]);
     }
@@ -748,44 +788,6 @@ class VehicleBookingController extends Controller
                 'failed_bookings' => $failedBookings,
                 'cutoff_time' => $cutoffTime->toISOString(),
             ]
-        ]);
-    }
-
-    /**
-     * Get booking status summary including expired bookings.
-     */
-    public function statusSummary(Request $request): JsonResponse
-    {
-        $user = $request->user();
-
-        /** @var Builder $baseQuery */
-        $baseQuery = VehicleBooking::query();
-
-        // Admin sees all stats, users see only their stats
-        if (!$user->can('view bookings') || $user->hasRole('User')) {
-            $baseQuery->where('user_id', $user->id);
-        }
-
-        $now = Carbon::now();
-
-        $stats = [
-            'total' => $baseQuery->count(),
-            'pending' => $baseQuery->clone()->where('status', 'pending')->count(),
-            'approved' => $baseQuery->clone()->where('status', 'approved')->count(),
-            'rejected' => $baseQuery->clone()->where('status', 'rejected')->count(),
-            'completed' => $baseQuery->clone()->where('status', 'completed')->count(),
-            'expired' => $baseQuery->clone()->where('status', 'approved')->where('end_time', '<', $now)->count(),
-            'active' => $baseQuery->clone()->where('status', 'approved')
-                ->where('start_time', '<=', $now)
-                ->where('end_time', '>=', $now)->count(),
-            'this_month' => $baseQuery->clone()->whereMonth('created_at', $now->month)->count(),
-            'today' => $baseQuery->clone()->whereDate('created_at', $now->toDateString())->count(),
-        ];
-
-        return response()->json([
-            'code' => 200,
-            'message' => 'Booking status summary retrieved successfully',
-            'data' => $stats
         ]);
     }
 }

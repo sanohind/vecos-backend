@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\VehicleController;
 use App\Http\Controllers\Api\VehicleBookingController;
+use App\Http\Controllers\Api\UserController;
 
 /*
 |--------------------------------------------------------------------------
@@ -40,8 +41,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/available', [VehicleController::class, 'available']);
         Route::get('/{vehicle}', [VehicleController::class, 'show']);
         
-        // Admin-only vehicle routes
-        Route::middleware(['role:Admin'])->group(function () {
+        // Admin and Superadmin vehicle routes
+        Route::middleware(['role:Admin|Superadmin'])->group(function () {
             Route::post('/', [VehicleController::class, 'store']);
             Route::put('/{vehicle}', [VehicleController::class, 'update']);
             Route::patch('/{vehicle}', [VehicleController::class, 'update']);
@@ -65,12 +66,24 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/{booking}', [VehicleBookingController::class, 'update']);
         Route::delete('/{booking}', [VehicleBookingController::class, 'destroy']);
         
-        // Admin-only booking routes
-Route::middleware(['role:Admin'])->group(function () {
-    Route::post('/{booking}/approve', [VehicleBookingController::class, 'approve']);
-    Route::post('/{booking}/reject', [VehicleBookingController::class, 'reject']);
-    Route::post('/{booking}/complete', [VehicleBookingController::class, 'complete']); // NEW!
-});
+        // Admin and Superadmin booking routes
+        Route::middleware(['role:Admin|Superadmin'])->group(function () {
+            Route::post('/{booking}/approve', [VehicleBookingController::class, 'approve']);
+            Route::post('/{booking}/reject', [VehicleBookingController::class, 'reject']);
+            Route::post('/{booking}/complete', [VehicleBookingController::class, 'complete']); // NEW!
+        });
+    });
+
+    // User Management Routes (Superadmin only)
+    Route::prefix('users')->middleware(['role:Superadmin'])->group(function () {
+        Route::get('/', [UserController::class, 'index']);
+        Route::post('/', [UserController::class, 'store']);
+        Route::get('/roles', [UserController::class, 'getRoles']);
+        Route::get('/departments', [UserController::class, 'getDepartments']);
+        Route::get('/{user}', [UserController::class, 'show']);
+        Route::put('/{user}', [UserController::class, 'update']);
+        Route::patch('/{user}', [UserController::class, 'update']);
+        Route::delete('/{user}', [UserController::class, 'destroy']);
     });
 
     // API Resource Routes (Alternative approach - commented for reference)
@@ -111,12 +124,12 @@ Route::get('/docs', function () {
                     'GET /api/vehicles' => 'List all vehicles (with search & filter)',
                     'GET /api/vehicles/available' => 'Get available vehicles for booking',
                     'GET /api/vehicles/{id}' => 'Get specific vehicle',
-                    'POST /api/vehicles' => 'Create vehicle (Admin only)',
-                    'PUT /api/vehicles/{id}' => 'Update vehicle (Admin only)',
-                    'DELETE /api/vehicles/{id}' => 'Delete vehicle (Admin only)',
+                    'POST /api/vehicles' => 'Create vehicle (Admin/Superadmin only)',
+                    'PUT /api/vehicles/{id}' => 'Update vehicle (Admin/Superadmin only)',
+                    'DELETE /api/vehicles/{id}' => 'Delete vehicle (Admin/Superadmin only)',
                 ],
                 'Bookings' => [
-                    'GET /api/bookings' => 'List user bookings (or all for Admin)',
+                    'GET /api/bookings' => 'List user bookings (or all for Admin/Superadmin)',
                     'GET /api/bookings/stats' => 'Get booking statistics',
                     'GET /api/bookings/schedule' => 'Get approved and pending bookings schedule (today & tomorrow by default)',
                     'GET /api/bookings/available-slots' => 'Get available time slots for a vehicle',
@@ -124,8 +137,17 @@ Route::get('/docs', function () {
                     'GET /api/bookings/{id}' => 'Get specific booking',
                     'PUT /api/bookings/{id}' => 'Update booking',
                     'DELETE /api/bookings/{id}' => 'Delete booking',
-                    'POST /api/bookings/{id}/approve' => 'Approve booking (Admin only)',
-                    'POST /api/bookings/{id}/reject' => 'Reject booking (Admin only)',
+                    'POST /api/bookings/{id}/approve' => 'Approve booking (Admin/Superadmin only)',
+                    'POST /api/bookings/{id}/reject' => 'Reject booking (Admin/Superadmin only)',
+                ],
+                'User Management (Superadmin only)' => [
+                    'GET /api/users' => 'List all users (with search & filter)',
+                    'POST /api/users' => 'Create new user',
+                    'GET /api/users/{id}' => 'Get specific user',
+                    'PUT /api/users/{id}' => 'Update user',
+                    'DELETE /api/users/{id}' => 'Delete user',
+                    'GET /api/users/roles' => 'Get available roles',
+                    'GET /api/users/departments' => 'Get available departments',
                 ],
             ],
             'schedule_endpoints' => [
@@ -149,6 +171,23 @@ Route::get('/docs', function () {
                     ],
                     'example' => '/api/bookings/available-slots?vehicle_id=1&date=2025-08-21&slot_duration=3'
                 ]
+            ],
+            'user_management_endpoints' => [
+                'GET /api/users' => [
+                    'description' => 'List all users with search, filter, and pagination',
+                    'parameters' => [
+                        'search' => 'optional - search in name, email, nik, or department',
+                        'role' => 'optional - filter by role name',
+                        'department' => 'optional - filter by department',
+                        'per_page' => 'optional - items per page (defaults to 15)',
+                    ],
+                    'example' => '/api/users?search=john&role=Admin&per_page=20'
+                ],
+                'POST /api/users' => [
+                    'description' => 'Create new user with role assignment',
+                    'required_fields' => ['name', 'email', 'password', 'password_confirmation', 'department', 'nik', 'roles'],
+                    'roles' => 'array of role names (e.g., ["Admin", "User"])',
+                ],
             ],
             'authentication' => 'Bearer Token (Laravel Sanctum)',
             'base_url' => url('/api'),

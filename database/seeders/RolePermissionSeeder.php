@@ -47,9 +47,24 @@ class RolePermissionSeeder extends Seeder
 
         // Create roles and assign permissions
         
-        // Admin role - full access
+        // Superadmin role - full access including user management
+        $superadminRole = Role::create(['name' => 'Superadmin']);
+        $superadminRole->givePermissionTo(Permission::all());
+        
+        // Admin role - full access to vehicles and bookings
         $adminRole = Role::create(['name' => 'Admin']);
-        $adminRole->givePermissionTo(Permission::all());
+        $adminRole->givePermissionTo([
+            'view vehicles',
+            'create vehicles',
+            'update vehicles',
+            'delete vehicles',
+            'view bookings',
+            'create bookings',
+            'update bookings',
+            'delete bookings',
+            'approve bookings',
+            'reject bookings',
+        ]);
 
         // User role - limited access
         $userRole = Role::create(['name' => 'User']);
@@ -63,6 +78,15 @@ class RolePermissionSeeder extends Seeder
 
         // Create demo users
         
+        // Superadmin user
+        $superadminUser = User::create([
+            'name' => 'Superadmin User',
+            'email' => 'superadmin@example.com',
+            'password' => Hash::make('password'),
+            'email_verified_at' => now(),
+        ]);
+        $superadminUser->assignRole('Superadmin');
+
         // Admin user
         $adminUser = User::create([
             'name' => 'Admin User',
@@ -84,6 +108,7 @@ class RolePermissionSeeder extends Seeder
         $regularUser->assignRole('User');
 
         $this->command->info('Roles and permissions seeded successfully!');
+        $this->command->info('Superadmin user: superadmin@example.com / password');
         $this->command->info('Admin user: admin@example.com / password');
         $this->command->info('Regular user: user@example.com / password');
     }

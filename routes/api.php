@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\VehicleController;
 use App\Http\Controllers\Api\VehicleBookingController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\PublicController;
 
 /*
 |--------------------------------------------------------------------------
@@ -24,12 +25,19 @@ Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
 });
 
+// Public Routes (No Authentication Required)
+Route::prefix('public')->group(function () {
+    Route::get('/schedule', [PublicController::class, 'schedule']);
+    Route::get('/vehicles', [PublicController::class, 'vehicles']);
+});
+
 // Protected Routes (Require Authentication)
 Route::middleware('auth:sanctum')->group(function () {
     
     // Authentication Routes
     Route::prefix('auth')->group(function () {
         Route::get('/me', [AuthController::class, 'me']);
+        Route::post('/refresh', [AuthController::class, 'refresh']);
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::post('/logout-all', [AuthController::class, 'logoutAll']);
     });

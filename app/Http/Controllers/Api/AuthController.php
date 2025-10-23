@@ -122,6 +122,36 @@ class AuthController extends Controller
     }
 
     /**
+     * Refresh token (create new token and delete old one).
+     */
+    public function refresh(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        
+        // Delete current token
+        $user->currentAccessToken()->delete();
+        
+        // Create new token
+        $token = $user->createToken('auth-token')->plainTextToken;
+
+        return response()->json([
+            'code' => 200,
+            'message' => 'Token refreshed successfully',
+            'data' => [
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'roles' => $user->getRoleNames(),
+                    'permissions' => $user->getAllPermissions()->pluck('name'),
+                ],
+                'token' => $token,
+                'token_type' => 'Bearer',
+            ]
+        ]);
+    }
+
+    /**
      * Logout user (revoke token).
      */
     public function logout(Request $request): JsonResponse

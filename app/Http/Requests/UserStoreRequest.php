@@ -26,7 +26,7 @@ class UserStoreRequest extends FormRequest
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'department' => ['nullable', Rule::in(['Accounting', 'Marketing', 'Purchasing', 'QC & Engineering', 'Maintenance', 'HR & GA', 'Brazing', 'Chassis', 'Nylon', 'PPIC'])],
+            'department' => ['nullable', Rule::in(['Accounting', 'Marketing', 'Purchasing', 'QC & Engineering', 'Maintenance', 'HR & GA', 'Brazing', 'Chassis', 'Nylon', 'PPIC', 'Jishuken'])],
             'nik' => 'nullable|string|min:6|unique:users,nik',
             'roles' => 'required|array|min:1',
             'roles.*' => 'string|exists:roles,name'

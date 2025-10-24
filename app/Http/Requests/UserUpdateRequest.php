@@ -26,7 +26,7 @@ class UserUpdateRequest extends FormRequest
             'name' => 'sometimes|required|string|max:255',
             'email' => ['sometimes', 'required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($this->route('user'))],
             'password' => 'sometimes|required|string|min:8|confirmed',
-            'department' => ['nullable', Rule::in(['Accounting', 'Marketing', 'Purchasing', 'QC & Engineering', 'Maintenance', 'HR & GA', 'Brazing', 'Chassis', 'Nylon', 'PPIC'])],
+            'department' => ['nullable', Rule::in(['Accounting', 'Marketing', 'Purchasing', 'QC & Engineering', 'Maintenance', 'HR & GA', 'Brazing', 'Chassis', 'Nylon', 'PPIC', 'Jishuken'])],
             'nik' => ['nullable', 'string', 'min:6', Rule::unique('users')->ignore($this->route('user'))],
             'roles' => 'sometimes|required|array|min:1',
             'roles.*' => 'string|exists:roles,name'

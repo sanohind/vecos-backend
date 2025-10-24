@@ -196,7 +196,8 @@ class UserController extends Controller
             'Brazing',
             'Chassis',
             'Nylon',
-            'PPIC'
+            'PPIC',
+            'Jishuken'
         ];
 
         return response()->json([
